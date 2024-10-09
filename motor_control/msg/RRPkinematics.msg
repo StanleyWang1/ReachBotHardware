@@ -1,0 +1,3 @@
+int64 roll_angle
+int64 pitch_angle
+int64 extension_angle
