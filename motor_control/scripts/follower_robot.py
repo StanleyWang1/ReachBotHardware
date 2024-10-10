@@ -9,22 +9,21 @@ from motor_control.msg import RRPkinematics
 
 ## -------------------- Dynamixel Configuration --------------------
 # Control table address for Dynamixel
-ADDR_PRESENT_POSITION   = 132
+ADDR_GOAL_POSITION   = 116
 # Protocol 2.0
 PROTOCOL_VERSION        = 2.0
 # Default setting (use appropriate values)
 BAUDRATE                = 57600
 DEVICENAME              = '/dev/ttyUSB0'  # Change to COM3 if on Windows
 # Motor IDs
-ROLL_MOTOR = 1
-PITCH_MOTOR = 2
-EXTENSION_MOTOR = 3
+ROLL_MOTOR = 4
+PITCH_MOTOR = 5
+EXTENSION_MOTOR = 6
 
-class LeaderRobot(Node):
+class FollowerRobot(Node):
     def __init__(self) -> None:
-        super().__init__("LeaderRobot")
-        self.leader_pub = self.create_publisher(RRPkinematics, "/LeaderKinematics", 10)
-        self.leader_timer = self.create_timer(0.1, self.leader_callback)
+        super().__init__("FollowerRobot")
+        self.motor_sub = self.create_subscription(RRPkinematics, "/LeaderKinematics", self.follower_callback, 10)
 
         # Initialize PortHandler and PacketHandler
         self.port_handler = dxl.PortHandler(DEVICENAME)
@@ -38,22 +37,20 @@ class LeaderRobot(Node):
             self.get_logger().error("Failed to set baudrate")
             return
         
-    def leader_callback(self) -> None:
-        msg = RRPkinematics()
-        msg.roll_angle = self.read_position(ROLL_MOTOR)
-        msg.pitch_angle = self.read_position(PITCH_MOTOR)
-        msg.extension_angle = self.read_position(EXTENSION_MOTOR)
-        self.leader_pub.publish(msg)
+    def follower_callback(self, msg: RRPkinematics) -> None:
+        self.write_position(ROLL_MOTOR, msg.roll_angle)
+        self.write_position(PITCH_MOTOR, msg.pitch_angle)
+        self.write_position(EXTENSION_MOTOR, msg.extension_angle)
     
-    def read_position(self, motor_id):
+    def write_position(self, motor_id, position):
         # Read present position of the Dynamixel motor
-        position, result, error = self.packet_handler.read4ByteTxRx(self.port_handler, motor_id, ADDR_PRESENT_POSITION)
+        result, error = self.packet_handler.write4ByteTxRx(self.port_handler, motor_id, ADDR_GOAL_POSITION, position)
         if result != dxl.COMM_SUCCESS:
-            self.get_logger().error(f"Failed to read position from motor {motor_id}: {self.packet_handler.getTxRxResult(result)}")
+            self.get_logger().error(f"Failed to write position from motor {motor_id}: {self.packet_handler.getTxRxResult(result)}")
         elif error != 0:
             self.get_logger().error(f"Motor {motor_id} error: {self.packet_handler.getRxPacketError(error)}")
         else:
-            self.get_logger().info(f"Motor {motor_id} position: {position}")
+            self.get_logger().info(f"Set Motor {motor_id} to position: {position}")
         return position
 
     def close_port(self):
@@ -65,7 +62,7 @@ class LeaderRobot(Node):
         
 if __name__ == "__main__":
     rclpy.init()
-    node = LeaderRobot()
+    node = FollowerRobot()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
