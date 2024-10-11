@@ -25,7 +25,7 @@ if(BUILD_TESTING)
 endif()
 
 install(PROGRAMS
-  scripts/dynamixel.py
+  scripts/follower_robot.py
   scripts/leader_robot.py
   DESTINATION lib/${PROJECT_NAME}
 )
